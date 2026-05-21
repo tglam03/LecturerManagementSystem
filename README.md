@@ -14,6 +14,8 @@ Hệ thống quản lý giảng viên được xây dựng bằng Java Core và 
 * Thống kê dữ liệu
 * Lưu dữ liệu bằng file `.dat`
 * Đọc dữ liệu từ file
+* Test commit
+* Command
 
 ---
 
