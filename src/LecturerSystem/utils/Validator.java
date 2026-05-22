@@ -1,14 +1,8 @@
 package LecturerSystem.utils;
 
-import LecturerSystem.service.QuanLyGiangVien;
-
 public class Validator {
     public static boolean isEmpty(String value) {
         return value == null || value.trim().isEmpty();
-    }
-
-    public static boolean isMaGiangVienTrung(String maGiangVien, QuanLyGiangVien quanLy) {
-        return quanLy != null && quanLy.isDuplicateMa(maGiangVien);
     }
 
     public static boolean isSoDienThoaiHopLe(String soDienThoai) {
@@ -18,12 +12,19 @@ public class Validator {
         return soDienThoai.matches("0\\d{9}");
     }
 
-    public static boolean isLuongHopLe(double value) {
-        return value >= 0;
+    public static boolean isEmailHopLe(String email) {
+        if (isEmpty(email)) {
+            return false;
+        }
+        return email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
     }
 
-    public static boolean isSoNguyenKhongAm(int value) {
-        return value >= 0;
+    public static boolean isHeSoLuongHopLe(double heSoLuong) {
+        return heSoLuong > 0;
+    }
+
+    public static boolean isSoTinChiHopLe(int soTinChi) {
+        return soTinChi > 0;
     }
 
     public static double parseDouble(String value) throws NumberFormatException {
