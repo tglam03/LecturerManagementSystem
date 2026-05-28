@@ -71,17 +71,17 @@ public class KhoaPanel extends JPanel {
     private JPanel initForm() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBackground(Color.WHITE);
+        // SỬA Ở ĐÂY: Đổi màu viền form nhập liệu sang xám đậm hơn (156, 163, 175)
         panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(226, 232, 240)),
+                BorderFactory.createLineBorder(new Color(156, 163, 175), 1),
                 new EmptyBorder(16, 18, 16, 18)));
 
         txtMaKhoa = createInput();
         txtTenKhoa = createInput();
-        txtTimKiem = createInput();
 
         addField(panel, 0, 0, "Mã khoa", txtMaKhoa);
         addField(panel, 0, 1, "Tên khoa", txtTenKhoa);
-        addField(panel, 1, 0, "Tìm kiếm", txtTimKiem);
+        
         return panel;
     }
 
@@ -104,27 +104,42 @@ public class KhoaPanel extends JPanel {
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.WHITE);
+        // SỬA Ở ĐÂY: Đổi màu viền khung Table sang xám đậm hơn
         panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(226, 232, 240)),
+                BorderFactory.createLineBorder(new Color(156, 163, 175), 1),
                 new EmptyBorder(10, 10, 10, 10)));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
         return panel;
     }
 
     private JPanel initButtons() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
+        panel.setBorder(new EmptyBorder(10, 0, 0, 0));
+
+        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        leftPanel.setOpaque(false);
         JButton btnThem = UIHelper.createButton("Thêm", UIHelper.SUCCESS);
         JButton btnSua = UIHelper.createButton("Sửa", UIHelper.PRIMARY);
         JButton btnXoa = UIHelper.createButton("Xóa", UIHelper.DANGER);
-        JButton btnTim = UIHelper.createButton("Tìm kiếm", new Color(14, 165, 233));
         JButton btnLamMoi = UIHelper.createButton("Làm mới", new Color(100, 116, 139));
 
-        panel.add(btnThem);
-        panel.add(btnSua);
-        panel.add(btnXoa);
-        panel.add(btnTim);
-        panel.add(btnLamMoi);
+        leftPanel.add(btnThem);
+        leftPanel.add(btnSua);
+        leftPanel.add(btnXoa);
+        leftPanel.add(btnLamMoi);
+
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        rightPanel.setOpaque(false);
+        txtTimKiem = createInput();
+        txtTimKiem.setPreferredSize(new Dimension(200, 36)); 
+        JButton btnTim = UIHelper.createButton("Tìm kiếm", new Color(14, 165, 233));
+
+        rightPanel.add(txtTimKiem);
+        rightPanel.add(btnTim);
+
+        panel.add(leftPanel, BorderLayout.WEST);
+        panel.add(rightPanel, BorderLayout.EAST);
 
         btnThem.addActionListener(e -> addKhoa());
         btnSua.addActionListener(e -> updateKhoa());
@@ -134,6 +149,7 @@ public class KhoaPanel extends JPanel {
             clearForm();
             loadTable(quanLyKhoa.getAll());
         });
+        
         return panel;
     }
 
@@ -229,8 +245,9 @@ public class KhoaPanel extends JPanel {
         JTextField field = new JTextField();
         field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         field.setPreferredSize(new Dimension(220, 36));
+        // SỬA Ở ĐÂY: Đổi màu viền ô nhập liệu (Input) sang xám đậm hơn
         field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(203, 213, 225)),
+                BorderFactory.createLineBorder(new Color(156, 163, 175), 1),
                 new EmptyBorder(0, 10, 0, 10)));
         return field;
     }
