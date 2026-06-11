@@ -58,6 +58,13 @@ public class GiangVienPanel extends JPanel {
     private DefaultTableModel tableModel;
     private String selectedMaGV;
 
+    // Các thuộc tính phân trang
+    private final ArrayList<GiangVien> currentList = new ArrayList<>();
+    private int currentPage = 1;
+    private final int rowsPerPage = 10;
+    private JButton btnFirst, btnPrev, btnNext, btnLast;
+    private JLabel lblPageInfo;
+
     public GiangVienPanel(QuanLyGiangVien quanLyGiangVien, QuanLyKhoa quanLyKhoa,
             QuanLyMonHoc quanLyMonHoc, Runnable onDataChanged) {
         this.quanLyGiangVien = quanLyGiangVien;
@@ -157,7 +164,65 @@ public class GiangVienPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.setPreferredSize(new Dimension(0, 300));
         panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Thanh phân trang ở phía dưới bảng
+        JPanel paginationBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        paginationBar.setBackground(Color.WHITE);
+
+        btnFirst = new JButton("|<");
+        btnPrev = new JButton("<");
+        btnNext = new JButton(">");
+        btnLast = new JButton(">|");
+        lblPageInfo = new JLabel("Trang 1 / 1");
+
+        stylePageButton(btnFirst);
+        stylePageButton(btnPrev);
+        stylePageButton(btnNext);
+        stylePageButton(btnLast);
+        lblPageInfo.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        lblPageInfo.setForeground(UIHelper.TEXT_DARK);
+
+        btnFirst.addActionListener(e -> {
+            currentPage = 1;
+            loadTable(currentList);
+        });
+        btnPrev.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadTable(currentList);
+            }
+        });
+        btnNext.addActionListener(e -> {
+            int totalPages = (int) Math.ceil((double) currentList.size() / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadTable(currentList);
+            }
+        });
+        btnLast.addActionListener(e -> {
+            int totalPages = (int) Math.ceil((double) currentList.size() / rowsPerPage);
+            currentPage = Math.max(1, totalPages);
+            loadTable(currentList);
+        });
+
+        paginationBar.add(btnFirst);
+        paginationBar.add(btnPrev);
+        paginationBar.add(lblPageInfo);
+        paginationBar.add(btnNext);
+        paginationBar.add(btnLast);
+
+        panel.add(paginationBar, BorderLayout.SOUTH);
         return panel;
+    }
+
+    private void stylePageButton(JButton button) {
+        button.setPreferredSize(new Dimension(45, 36));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setBackground(Color.WHITE);
+        button.setForeground(UIHelper.TEXT_DARK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(new Color(203, 213, 225)));
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
     }
 
     private JPanel initFilterBar() {
@@ -191,8 +256,25 @@ public class GiangVienPanel extends JPanel {
         gbc.insets = new Insets(0, 0, 0, 0);
         panel.add(btnLoc, gbc);
 
-        btnTim.addActionListener(e -> loadTable(quanLyGiangVien.searchGiangVien(txtTimKiem.getText())));
-        btnLoc.addActionListener(e -> applyFilter());
+        btnTim.addActionListener(e -> {
+            currentPage = 1;
+            String query = txtTimKiem.getText().trim();
+            if (query.isEmpty()) {
+                loadTable(quanLyGiangVien.getAll());
+            } else {
+                ArrayList<GiangVien> results = quanLyGiangVien.searchGiangVien(query);
+                if (results.isEmpty()) {
+                    MessageDialog.showInfo(this, "Không tìm thấy kết quả phù hợp!");
+                    loadTable(results);
+                } else {
+                    loadTable(results);
+                }
+            }
+        });
+        btnLoc.addActionListener(e -> {
+            currentPage = 1;
+            applyFilter();
+        });
         return panel;
     }
 
@@ -213,6 +295,7 @@ public class GiangVienPanel extends JPanel {
         btnSua.addActionListener(e -> updateGiangVien());
         btnXoa.addActionListener(e -> deleteGiangVien());
         btnLamMoi.addActionListener(e -> {
+            currentPage = 1;
             clearForm();
             reloadComboData();
             loadTable(quanLyGiangVien.getAll());
@@ -248,15 +331,23 @@ public class GiangVienPanel extends JPanel {
     }
 
     private void addGiangVien() {
-        GiangVien gv = createGiangVienFromForm(true);
-        if (gv == null) {
+        if (!validateGiangVien()) {
             return;
         }
+        String maMoi = txtMaGV.getText().trim();
+        if (kiemTraTrungMaGiangVien(maMoi)) {
+            MessageDialog.showError(this, "Mã giảng viên đã tồn tại.");
+            txtMaGV.requestFocus();
+            return;
+        }
+
+        GiangVien gv = createGiangVienFromForm();
         if (quanLyGiangVien.addGiangVien(gv)) {
             afterDataChanged("Thêm giảng viên thành công");
             clearForm();
         } else {
-            MessageDialog.showError(this, "Mã giảng viên đã tồn tại");
+            MessageDialog.showError(this, "Mã giảng viên đã tồn tại.");
+            txtMaGV.requestFocus();
         }
     }
 
@@ -265,10 +356,17 @@ public class GiangVienPanel extends JPanel {
             MessageDialog.showError(this, "Vui lòng chọn giảng viên cần sửa");
             return;
         }
-        GiangVien gv = createGiangVienFromForm(false);
-        if (gv == null) {
+        if (!validateGiangVien()) {
             return;
         }
+        String maMoi = txtMaGV.getText().trim();
+        if (!maMoi.equalsIgnoreCase(selectedMaGV) && kiemTraTrungMaGiangVien(maMoi)) {
+            MessageDialog.showError(this, "Mã giảng viên đã tồn tại.");
+            txtMaGV.requestFocus();
+            return;
+        }
+
+        GiangVien gv = createGiangVienFromForm();
         if (quanLyGiangVien.updateGiangVien(selectedMaGV, gv)) {
             selectedMaGV = gv.getMaGV();
             afterDataChanged("Cập nhật giảng viên thành công");
@@ -280,7 +378,18 @@ public class GiangVienPanel extends JPanel {
             MessageDialog.showError(this, "Vui lòng chọn giảng viên cần xóa");
             return;
         }
-        if (!MessageDialog.confirm(this, "Bạn có chắc muốn xóa giảng viên này?")) {
+        GiangVien target = null;
+        for (GiangVien gv : quanLyGiangVien.getAll()) {
+            if (selectedMaGV.equalsIgnoreCase(gv.getMaGV())) {
+                target = gv;
+                break;
+            }
+        }
+        if (target == null) {
+            MessageDialog.showError(this, "Không tìm thấy giảng viên cần xóa");
+            return;
+        }
+        if (!xacNhanXoa(target)) {
             return;
         }
         if (quanLyGiangVien.deleteGiangVien(selectedMaGV)) {
@@ -289,13 +398,10 @@ public class GiangVienPanel extends JPanel {
         }
     }
 
-    private GiangVien createGiangVienFromForm(boolean isAdd) {
-        if (!validateForm(isAdd)) {
-            return null;
-        }
+    private GiangVien createGiangVienFromForm() {
         Khoa khoa = (Khoa) cboKhoa.getSelectedItem();
         MonHoc monHoc = (MonHoc) cboMonHoc.getSelectedItem();
-        double heSoLuong = Validator.parseDouble(txtHeSoLuong.getText());
+        double heSoLuong = Double.parseDouble(txtHeSoLuong.getText().trim());
         return new GiangVien(
                 txtMaGV.getText().trim(),
                 txtHoTen.getText().trim(),
@@ -313,49 +419,168 @@ public class GiangVienPanel extends JPanel {
                 cboTrangThai.getSelectedItem().toString());
     }
 
-    private boolean validateForm(boolean isAdd) {
-        if (Validator.isEmpty(txtMaGV.getText()) || Validator.isEmpty(txtHoTen.getText())
-                || Validator.isEmpty(txtNgaySinh.getText()) || Validator.isEmpty(txtDiaChi.getText())
-                || Validator.isEmpty(txtSoDienThoai.getText()) || Validator.isEmpty(txtEmail.getText())
-                || Validator.isEmpty(txtHeSoLuong.getText())) {
-            MessageDialog.showError(this, "Vui lòng nhập đầy đủ thông tin giảng viên");
+    private boolean validateGiangVien() {
+        String maGV = txtMaGV.getText().trim();
+        String hoTen = txtHoTen.getText().trim();
+        String ngaySinhStr = txtNgaySinh.getText().trim();
+        String sdt = txtSoDienThoai.getText().trim();
+        String email = txtEmail.getText().trim();
+        String hslStr = txtHeSoLuong.getText().trim();
+        String diaChi = txtDiaChi.getText().trim();
+
+        // 1. Mã giảng viên
+        if (Validator.isEmpty(maGV)) {
+            MessageDialog.showError(this, "Mã giảng viên không được để trống.");
+            txtMaGV.requestFocus();
             return false;
         }
-        if (cboKhoa.getItemCount() == 0) {
-            MessageDialog.showError(this, "Vui lòng thêm khoa trước khi thêm giảng viên");
+        if (!maGV.matches("^[A-Za-z0-9]{3,10}$")) {
+            MessageDialog.showError(this, "Mã giảng viên không hợp lệ.");
+            txtMaGV.requestFocus();
             return false;
         }
-        if (cboMonHoc.getItemCount() == 0) {
-            MessageDialog.showError(this, "Vui lòng thêm môn học trước khi thêm giảng viên");
+
+        // 2. Họ tên
+        if (Validator.isEmpty(hoTen) || !hoTen.matches("^[\\p{L}\\s]{2,50}$")) {
+            MessageDialog.showError(this, "Họ tên không hợp lệ.");
+            txtHoTen.requestFocus();
             return false;
         }
-        if (!Validator.isSoDienThoaiHopLe(txtSoDienThoai.getText().trim())) {
-            MessageDialog.showError(this, "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0");
+
+        // 3. Ngày sinh
+        if (Validator.isEmpty(ngaySinhStr)) {
+            MessageDialog.showError(this, "Ngày sinh không được để trống.");
+            txtNgaySinh.requestFocus();
             return false;
         }
-        if (!Validator.isEmailHopLe(txtEmail.getText().trim())) {
-            MessageDialog.showError(this, "Email không hợp lệ");
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy");
+        sdf.setLenient(false);
+        java.util.Date ngaySinh;
+        try {
+            ngaySinh = sdf.parse(ngaySinhStr);
+        } catch (Exception e) {
+            MessageDialog.showError(this, "Ngày sinh không hợp lệ (định dạng đúng: dd/MM/yyyy).");
+            txtNgaySinh.requestFocus();
             return false;
         }
-        String maMoi = txtMaGV.getText().trim();
-        if ((isAdd || !maMoi.equalsIgnoreCase(selectedMaGV)) && quanLyGiangVien.isDuplicateMa(maMoi)) {
-            MessageDialog.showError(this, "Mã giảng viên không được trùng");
+        java.util.Date current = new java.util.Date();
+        if (ngaySinh.after(current)) {
+            MessageDialog.showError(this, "Ngày sinh không được lớn hơn ngày hiện tại.");
+            txtNgaySinh.requestFocus();
+            return false;
+        }
+        java.util.Calendar dob = java.util.Calendar.getInstance();
+        dob.setTime(ngaySinh);
+        java.util.Calendar today = java.util.Calendar.getInstance();
+        int age = today.get(java.util.Calendar.YEAR) - dob.get(java.util.Calendar.YEAR);
+        if (today.get(java.util.Calendar.DAY_OF_YEAR) < dob.get(java.util.Calendar.DAY_OF_YEAR)) {
+            age--;
+        }
+        if (age < 22 || age > 70) {
+            MessageDialog.showError(this, "Tuổi giảng viên phải từ 22 đến 70.");
+            txtNgaySinh.requestFocus();
+            return false;
+        }
+
+        // 4. Giới tính
+        if (cboGioiTinh.getSelectedItem() == null) {
+            MessageDialog.showError(this, "Vui lòng chọn giới tính.");
+            cboGioiTinh.requestFocus();
+            return false;
+        }
+
+        // 5. Số điện thoại
+        if (Validator.isEmpty(sdt)) {
+            MessageDialog.showError(this, "Số điện thoại phải gồm 10 chữ số.");
+            txtSoDienThoai.requestFocus();
+            return false;
+        }
+        if (!sdt.matches("^0\\d{9}$")) {
+            MessageDialog.showError(this, "Số điện thoại phải gồm 10 chữ số.");
+            txtSoDienThoai.requestFocus();
+            return false;
+        }
+
+        // 6. Email
+        if (Validator.isEmpty(email)) {
+            MessageDialog.showError(this, "Email không đúng định dạng.");
+            txtEmail.requestFocus();
+            return false;
+        }
+        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+            MessageDialog.showError(this, "Email không đúng định dạng.");
+            txtEmail.requestFocus();
+            return false;
+        }
+
+        // 7. Khoa
+        if (cboKhoa.getSelectedItem() == null || cboKhoa.getItemCount() == 0) {
+            MessageDialog.showError(this, "Vui lòng chọn khoa.");
+            cboKhoa.requestFocus();
+            return false;
+        }
+
+        // 8. Môn học
+        if (cboMonHoc.getSelectedItem() == null || cboMonHoc.getItemCount() == 0) {
+            MessageDialog.showError(this, "Vui lòng chọn môn học.");
+            cboMonHoc.requestFocus();
+            return false;
+        }
+
+        // 9. Học vị
+        if (cboHocVi.getSelectedItem() == null) {
+            MessageDialog.showError(this, "Vui lòng chọn học vị.");
+            cboHocVi.requestFocus();
+            return false;
+        }
+
+        // 10. Hệ số lương
+        if (Validator.isEmpty(hslStr)) {
+            MessageDialog.showError(this, "Hệ số lương không hợp lệ.");
+            txtHeSoLuong.requestFocus();
             return false;
         }
         try {
-            double heSoLuong = Validator.parseDouble(txtHeSoLuong.getText());
-            if (!Validator.isHeSoLuongHopLe(heSoLuong)) {
-                MessageDialog.showError(this, "Hệ số lương phải lớn hơn 0");
+            double hsl = Double.parseDouble(hslStr);
+            if (hsl <= 0 || hsl > 30) {
+                MessageDialog.showError(this, "Hệ số lương không hợp lệ.");
+                txtHeSoLuong.requestFocus();
                 return false;
             }
-        } catch (NumberFormatException ex) {
-            MessageDialog.showError(this, "Hệ số lương phải là số");
+        } catch (NumberFormatException e) {
+            MessageDialog.showError(this, "Hệ số lương không hợp lệ.");
+            txtHeSoLuong.requestFocus();
             return false;
         }
+
+        // 11. Trạng thái
+        if (cboTrangThai.getSelectedItem() == null) {
+            MessageDialog.showError(this, "Vui lòng chọn trạng thái.");
+            cboTrangThai.requestFocus();
+            return false;
+        }
+
+        // 12. Địa chỉ
+        if (!diaChi.isEmpty() && diaChi.length() > 200) {
+            MessageDialog.showError(this, "Địa chỉ không được vượt quá 200 ký tự.");
+            txtDiaChi.requestFocus();
+            return false;
+        }
+
         return true;
     }
 
+    private boolean kiemTraTrungMaGiangVien(String maGV) {
+        return quanLyGiangVien.isDuplicateMa(maGV);
+    }
+
+    private boolean xacNhanXoa(GiangVien gv) {
+        String msg = "Giảng viên:\n" + gv.getHoTen() + "\n\nMã:\n" + gv.getMaGV() + "\n\nBạn có chắc muốn xóa?";
+        return MessageDialog.confirm(this, msg);
+    }
+
     private void applyFilter() {
+        currentPage = 1;
         Object khoaFilter = cboFilterKhoa.getSelectedItem();
         String hocViFilter = cboFilterHocVi.getSelectedItem().toString();
         ArrayList<GiangVien> ketQua = new ArrayList<GiangVien>();
@@ -376,6 +601,7 @@ public class GiangVienPanel extends JPanel {
     }
 
     private void afterDataChanged(String message) {
+        currentPage = 1;
         loadTable(quanLyGiangVien.getAll());
         if (onDataChanged != null) {
             onDataChanged.run();
@@ -384,8 +610,35 @@ public class GiangVienPanel extends JPanel {
     }
 
     private void loadTable(ArrayList<GiangVien> list) {
+        if (list != currentList) {
+            currentList.clear();
+            currentList.addAll(list);
+        }
+
+        int totalRows = currentList.size();
+        int totalPages = (int) Math.ceil((double) totalRows / rowsPerPage);
+        if (totalPages == 0) {
+            totalPages = 1;
+        }
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+
+        lblPageInfo.setText("Trang " + currentPage + " / " + totalPages);
+        btnFirst.setEnabled(currentPage > 1);
+        btnPrev.setEnabled(currentPage > 1);
+        btnNext.setEnabled(currentPage < totalPages);
+        btnLast.setEnabled(currentPage < totalPages);
+
         tableModel.setRowCount(0);
-        for (GiangVien gv : list) {
+        int startIndex = (currentPage - 1) * rowsPerPage;
+        int endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+
+        for (int i = startIndex; i < endIndex; i++) {
+            GiangVien gv = currentList.get(i);
             tableModel.addRow(new Object[]{
                 gv.getMaGV(),
                 gv.getHoTen(),

@@ -64,6 +64,31 @@ public class QuanLyKhoa {
         return findIndexByMa(maKhoa) != -1;
     }
 
+    public boolean isDuplicateTen(String tenKhoa) {
+        if (tenKhoa == null) {
+            return false;
+        }
+        for (Khoa khoa : danhSachKhoa) {
+            if (tenKhoa.trim().equalsIgnoreCase(khoa.getTenKhoa().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isDuplicateTenForUpdate(String maKhoa, String tenKhoa) {
+        if (tenKhoa == null) {
+            return false;
+        }
+        for (Khoa khoa : danhSachKhoa) {
+            if (!khoa.getMaKhoa().equalsIgnoreCase(maKhoa) 
+                    && tenKhoa.trim().equalsIgnoreCase(khoa.getTenKhoa().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private int findIndexByMa(String maKhoa) {
         if (maKhoa == null) {
             return -1;

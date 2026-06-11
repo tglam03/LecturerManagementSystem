@@ -1,5 +1,6 @@
 package LecturerSystem.view;
 
+import LecturerSystem.service.QuanLyGiangVien;
 import LecturerSystem.model.Khoa;
 import LecturerSystem.service.QuanLyKhoa;
 import LecturerSystem.utils.MessageDialog;
@@ -27,6 +28,7 @@ import javax.swing.table.DefaultTableModel;
 
 public class KhoaPanel extends JPanel {
     private final QuanLyKhoa quanLyKhoa;
+    private final QuanLyGiangVien quanLyGiangVien;
     private final Runnable onDataChanged;
     private JTextField txtMaKhoa;
     private JTextField txtTenKhoa;
@@ -35,8 +37,16 @@ public class KhoaPanel extends JPanel {
     private DefaultTableModel tableModel;
     private String selectedMaKhoa;
 
-    public KhoaPanel(QuanLyKhoa quanLyKhoa, Runnable onDataChanged) {
+    // Các thuộc tính phân trang
+    private final ArrayList<Khoa> currentList = new ArrayList<>();
+    private int currentPage = 1;
+    private final int rowsPerPage = 10;
+    private JButton btnFirst, btnPrev, btnNext, btnLast;
+    private JLabel lblPageInfo;
+
+    public KhoaPanel(QuanLyKhoa quanLyKhoa, QuanLyGiangVien quanLyGiangVien, Runnable onDataChanged) {
         this.quanLyKhoa = quanLyKhoa;
+        this.quanLyGiangVien = quanLyGiangVien;
         this.onDataChanged = onDataChanged;
         initComponents();
         loadTable(quanLyKhoa.getAll());
@@ -109,7 +119,65 @@ public class KhoaPanel extends JPanel {
                 BorderFactory.createLineBorder(new Color(156, 163, 175), 1),
                 new EmptyBorder(10, 10, 10, 10)));
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // Thanh phân trang ở phía dưới bảng
+        JPanel paginationBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        paginationBar.setBackground(Color.WHITE);
+
+        btnFirst = new JButton("|<");
+        btnPrev = new JButton("<");
+        btnNext = new JButton(">");
+        btnLast = new JButton(">|");
+        lblPageInfo = new JLabel("Trang 1 / 1");
+
+        stylePageButton(btnFirst);
+        stylePageButton(btnPrev);
+        stylePageButton(btnNext);
+        stylePageButton(btnLast);
+        lblPageInfo.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        lblPageInfo.setForeground(UIHelper.TEXT_DARK);
+
+        btnFirst.addActionListener(e -> {
+            currentPage = 1;
+            loadTable(currentList);
+        });
+        btnPrev.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadTable(currentList);
+            }
+        });
+        btnNext.addActionListener(e -> {
+            int totalPages = (int) Math.ceil((double) currentList.size() / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadTable(currentList);
+            }
+        });
+        btnLast.addActionListener(e -> {
+            int totalPages = (int) Math.ceil((double) currentList.size() / rowsPerPage);
+            currentPage = Math.max(1, totalPages);
+            loadTable(currentList);
+        });
+
+        paginationBar.add(btnFirst);
+        paginationBar.add(btnPrev);
+        paginationBar.add(lblPageInfo);
+        paginationBar.add(btnNext);
+        paginationBar.add(btnLast);
+
+        panel.add(paginationBar, BorderLayout.SOUTH);
         return panel;
+    }
+
+    private void stylePageButton(JButton button) {
+        button.setPreferredSize(new Dimension(45, 36));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setBackground(Color.WHITE);
+        button.setForeground(UIHelper.TEXT_DARK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(new Color(203, 213, 225)));
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
     }
 
     private JPanel initButtons() {
@@ -144,8 +212,23 @@ public class KhoaPanel extends JPanel {
         btnThem.addActionListener(e -> addKhoa());
         btnSua.addActionListener(e -> updateKhoa());
         btnXoa.addActionListener(e -> deleteKhoa());
-        btnTim.addActionListener(e -> loadTable(quanLyKhoa.searchKhoa(txtTimKiem.getText())));
+        btnTim.addActionListener(e -> {
+            currentPage = 1;
+            String query = txtTimKiem.getText().trim();
+            if (query.isEmpty()) {
+                loadTable(quanLyKhoa.getAll());
+            } else {
+                ArrayList<Khoa> results = quanLyKhoa.searchKhoa(query);
+                if (results.isEmpty()) {
+                    MessageDialog.showInfo(this, "Không tìm thấy kết quả phù hợp!");
+                    loadTable(results);
+                } else {
+                    loadTable(results);
+                }
+            }
+        });
         btnLamMoi.addActionListener(e -> {
+            currentPage = 1;
             clearForm();
             loadTable(quanLyKhoa.getAll());
         });
@@ -154,14 +237,29 @@ public class KhoaPanel extends JPanel {
     }
 
     private void addKhoa() {
-        if (!validateForm(true)) {
+        if (!validateKhoa()) {
             return;
         }
-        Khoa khoa = new Khoa(txtMaKhoa.getText().trim(), txtTenKhoa.getText().trim());
+        String maMoi = txtMaKhoa.getText().trim();
+        String tenMoi = txtTenKhoa.getText().trim();
+
+        if (kiemTraTrungMaKhoa(maMoi)) {
+            MessageDialog.showError(this, "Mã khoa đã tồn tại.");
+            txtMaKhoa.requestFocus();
+            return;
+        }
+        if (quanLyKhoa.isDuplicateTen(tenMoi)) {
+            MessageDialog.showError(this, "Tên khoa đã tồn tại.");
+            txtTenKhoa.requestFocus();
+            return;
+        }
+
+        Khoa khoa = new Khoa(maMoi, tenMoi);
         if (quanLyKhoa.addKhoa(khoa)) {
             afterDataChanged("Thêm khoa thành công");
         } else {
-            MessageDialog.showError(this, "Mã khoa đã tồn tại");
+            MessageDialog.showError(this, "Mã khoa đã tồn tại.");
+            txtMaKhoa.requestFocus();
         }
     }
 
@@ -170,10 +268,33 @@ public class KhoaPanel extends JPanel {
             MessageDialog.showError(this, "Vui lòng chọn khoa cần sửa");
             return;
         }
-        if (!validateForm(false)) {
+        if (!validateKhoa()) {
             return;
         }
-        Khoa khoa = new Khoa(txtMaKhoa.getText().trim(), txtTenKhoa.getText().trim());
+        String maMoi = txtMaKhoa.getText().trim();
+        String tenMoi = txtTenKhoa.getText().trim();
+
+        if (!maMoi.equalsIgnoreCase(selectedMaKhoa)) {
+            int count = demSoGiangVienThuocKhoa(selectedMaKhoa);
+            if (count > 0) {
+                MessageDialog.showError(this, "Khoa " + selectedMaKhoa + " đang có " + count + " giảng viên. Không cho phép sửa mã khoa. Phải chuyển toàn bộ giảng viên sang khoa khác trước.");
+                txtMaKhoa.requestFocus();
+                return;
+            }
+            if (kiemTraTrungMaKhoa(maMoi)) {
+                MessageDialog.showError(this, "Mã khoa đã tồn tại.");
+                txtMaKhoa.requestFocus();
+                return;
+            }
+        }
+
+        if (quanLyKhoa.isDuplicateTenForUpdate(selectedMaKhoa, tenMoi)) {
+            MessageDialog.showError(this, "Tên khoa đã tồn tại.");
+            txtTenKhoa.requestFocus();
+            return;
+        }
+
+        Khoa khoa = new Khoa(maMoi, tenMoi);
         if (quanLyKhoa.updateKhoa(selectedMaKhoa, khoa)) {
             selectedMaKhoa = khoa.getMaKhoa();
             afterDataChanged("Cập nhật khoa thành công");
@@ -185,29 +306,82 @@ public class KhoaPanel extends JPanel {
             MessageDialog.showError(this, "Vui lòng chọn khoa cần xóa");
             return;
         }
-        if (!MessageDialog.confirm(this, "Bạn có chắc muốn xóa khoa này?")) {
+        
+        int n = demSoGiangVienThuocKhoa(selectedMaKhoa);
+        if (n > 0) {
+            String tenKhoa = txtTenKhoa.getText().trim();
+            String msg = selectedMaKhoa + " - " + tenKhoa + "\nSố giảng viên:\n" + n + "\nKhông thể xóa.";
+            MessageDialog.showError(this, msg);
             return;
         }
+
+        if (!xacNhanXoa()) {
+            return;
+        }
+
         if (quanLyKhoa.deleteKhoa(selectedMaKhoa)) {
             afterDataChanged("Xóa khoa thành công");
             clearForm();
         }
     }
 
-    private boolean validateForm(boolean isAdd) {
-        if (Validator.isEmpty(txtMaKhoa.getText()) || Validator.isEmpty(txtTenKhoa.getText())) {
-            MessageDialog.showError(this, "Vui lòng nhập đầy đủ mã khoa và tên khoa");
+    private boolean validateKhoa() {
+        String maKhoa = txtMaKhoa.getText().trim();
+        String tenKhoa = txtTenKhoa.getText().trim();
+
+        // Validate mã khoa
+        if (Validator.isEmpty(maKhoa)) {
+            MessageDialog.showError(this, "Mã khoa không được để trống.");
+            txtMaKhoa.requestFocus();
             return false;
         }
-        String maMoi = txtMaKhoa.getText().trim();
-        if ((isAdd || !maMoi.equalsIgnoreCase(selectedMaKhoa)) && quanLyKhoa.isDuplicateMa(maMoi)) {
-            MessageDialog.showError(this, "Mã khoa không được trùng");
+        if (!maKhoa.matches("^[A-Z0-9]{3,10}$")) {
+            MessageDialog.showError(this, "Mã khoa không hợp lệ.");
+            txtMaKhoa.requestFocus();
             return false;
         }
+
+        // Validate tên khoa
+        if (Validator.isEmpty(tenKhoa)) {
+            MessageDialog.showError(this, "Tên khoa không được để trống.");
+            txtTenKhoa.requestFocus();
+            return false;
+        }
+        if (tenKhoa.length() < 3 || tenKhoa.length() > 100) {
+            MessageDialog.showError(this, "Tên khoa phải từ 3 đến 100 ký tự.");
+            txtTenKhoa.requestFocus();
+            return false;
+        }
+
         return true;
     }
 
+    private boolean kiemTraTrungMaKhoa(String maKhoa) {
+        return quanLyKhoa.isDuplicateMa(maKhoa);
+    }
+
+    private int demSoGiangVienThuocKhoa(String maKhoa) {
+        int count = 0;
+        if (quanLyGiangVien != null) {
+            for (LecturerSystem.model.GiangVien gv : quanLyGiangVien.getAll()) {
+                if (maKhoa.equalsIgnoreCase(gv.getMaKhoa())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private boolean coGiangVienThuocKhoa(String maKhoa) {
+        return demSoGiangVienThuocKhoa(maKhoa) > 0;
+    }
+
+    private boolean xacNhanXoa() {
+        return MessageDialog.confirm(this, "Bạn có chắc chắn muốn xóa dữ liệu này?");
+    }
+
     private void afterDataChanged(String message) {
+        currentPage = 1;
         loadTable(quanLyKhoa.getAll());
         if (onDataChanged != null) {
             onDataChanged.run();
@@ -216,8 +390,35 @@ public class KhoaPanel extends JPanel {
     }
 
     private void loadTable(ArrayList<Khoa> list) {
+        if (list != currentList) {
+            currentList.clear();
+            currentList.addAll(list);
+        }
+
+        int totalRows = currentList.size();
+        int totalPages = (int) Math.ceil((double) totalRows / rowsPerPage);
+        if (totalPages == 0) {
+            totalPages = 1;
+        }
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+
+        lblPageInfo.setText("Trang " + currentPage + " / " + totalPages);
+        btnFirst.setEnabled(currentPage > 1);
+        btnPrev.setEnabled(currentPage > 1);
+        btnNext.setEnabled(currentPage < totalPages);
+        btnLast.setEnabled(currentPage < totalPages);
+
         tableModel.setRowCount(0);
-        for (Khoa khoa : list) {
+        int startIndex = (currentPage - 1) * rowsPerPage;
+        int endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+
+        for (int i = startIndex; i < endIndex; i++) {
+            Khoa khoa = currentList.get(i);
             tableModel.addRow(new Object[]{khoa.getMaKhoa(), khoa.getTenKhoa()});
         }
     }

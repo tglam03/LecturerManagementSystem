@@ -64,6 +64,31 @@ public class QuanLyMonHoc {
         return findIndexByMa(maMon) != -1;
     }
 
+    public boolean isDuplicateTen(String tenMon) {
+        if (tenMon == null) {
+            return false;
+        }
+        for (MonHoc mon : danhSachMonHoc) {
+            if (tenMon.trim().equalsIgnoreCase(mon.getTenMon().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isDuplicateTenForUpdate(String maMon, String tenMon) {
+        if (tenMon == null) {
+            return false;
+        }
+        for (MonHoc mon : danhSachMonHoc) {
+            if (!mon.getMaMon().equalsIgnoreCase(maMon) 
+                    && tenMon.trim().equalsIgnoreCase(mon.getTenMon().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private int findIndexByMa(String maMon) {
         if (maMon == null) {
             return -1;
