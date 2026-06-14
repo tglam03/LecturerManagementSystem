@@ -10,6 +10,7 @@ import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.FlowLayout;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -33,9 +34,11 @@ import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 public class DashboardFrame extends JFrame {
+
     private static final Color SIDEBAR_COLOR = new Color(30, 41, 59);
     private static final Color SIDEBAR_HOVER = new Color(51, 65, 85);
 
@@ -57,6 +60,14 @@ public class DashboardFrame extends JFrame {
     private KhoaPanel khoaPanel;
     private MonHocPanel monHocPanel;
     private ThongKePanel thongKePanel;
+
+    // Các thuộc tính phân trang và tìm kiếm cho Dashboard
+    private final ArrayList<GiangVien> currentOverviewList = new ArrayList<>();
+    private int currentPage = 1;
+    private final int rowsPerPage = 10;
+    private javax.swing.JTextField txtSearchDashboard;
+    private javax.swing.JButton btnFirst, btnPrev, btnNext, btnLast;
+    private JLabel lblPageInfo;
 
     public DashboardFrame() {
         quanLyGiangVien = new QuanLyGiangVien();
@@ -81,8 +92,8 @@ public class DashboardFrame extends JFrame {
         contentPanel.setBackground(UIHelper.BG);
 
         giangVienPanel = new GiangVienPanel(quanLyGiangVien, quanLyKhoa, quanLyMonHoc, this::refreshAll);
-        khoaPanel = new KhoaPanel(quanLyKhoa, this::refreshAll);
-        monHocPanel = new MonHocPanel(quanLyMonHoc, this::refreshAll);
+        khoaPanel = new KhoaPanel(quanLyKhoa, quanLyGiangVien, this::refreshAll);
+        monHocPanel = new MonHocPanel(quanLyMonHoc, quanLyGiangVien, this::refreshAll);
         thongKePanel = new ThongKePanel(quanLyGiangVien, quanLyKhoa, quanLyMonHoc);
 
         contentPanel.add(initDashboardPanel(), "dashboard");
@@ -257,13 +268,122 @@ public class DashboardFrame extends JFrame {
         tblOverview = new JTable(overviewModel);
         UIHelper.styleTable(tblOverview);
 
+        // Dữ liệu căn trái
+        DefaultTableCellRenderer leftCellRenderer = new DefaultTableCellRenderer();
+        leftCellRenderer.setHorizontalAlignment(SwingConstants.LEFT);
+
+        // Tiêu đề căn trái
+        DefaultTableCellRenderer leftHeaderRenderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(
+                    JTable table, Object value, boolean isSelected,
+                    boolean hasFocus, int row, int column) {
+
+                JLabel label = (JLabel) super.getTableCellRendererComponent(
+                        table, value, isSelected, hasFocus, row, column);
+
+                label.setHorizontalAlignment(SwingConstants.LEFT);
+                label.setFont(label.getFont().deriveFont(Font.BOLD));
+
+                return label;
+            }
+        };
+
+        // Áp dụng cho tất cả các cột
+        for (int i = 0; i < tblOverview.getColumnCount(); i++) {
+            tblOverview.getColumnModel().getColumn(i)
+                    .setCellRenderer(leftCellRenderer);
+
+            tblOverview.getColumnModel().getColumn(i)
+                    .setHeaderRenderer(leftHeaderRenderer);
+        }
+
+        // Thanh tìm kiếm ở phía trên bảng tổng quan
+        JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        searchBar.setOpaque(false);
+        searchBar.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+
+        txtSearchDashboard = new javax.swing.JTextField();
+        txtSearchDashboard.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        txtSearchDashboard.setPreferredSize(new Dimension(200, 36));
+        txtSearchDashboard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(203, 213, 225)),
+                BorderFactory.createEmptyBorder(0, 10, 0, 10)));
+
+        JButton btnSearch = UIHelper.createButton("Tìm kiếm", new Color(14, 165, 233));
+        btnSearch.addActionListener(e -> {
+            currentPage = 1;
+            loadOverview();
+        });
+
+        searchBar.add(txtSearchDashboard);
+        searchBar.add(btnSearch);
+
+        // Thanh phân trang ở phía dưới bảng tổng quan
+        JPanel paginationBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        paginationBar.setBackground(Color.WHITE);
+
+        btnFirst = new JButton("|<");
+        btnPrev = new JButton("<");
+        btnNext = new JButton(">");
+        btnLast = new JButton(">|");
+        lblPageInfo = new JLabel("Trang 1 / 1");
+
+        stylePageButton(btnFirst);
+        stylePageButton(btnPrev);
+        stylePageButton(btnNext);
+        stylePageButton(btnLast);
+        lblPageInfo.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        lblPageInfo.setForeground(UIHelper.TEXT_DARK);
+
+        btnFirst.addActionListener(e -> {
+            currentPage = 1;
+            loadOverview();
+        });
+        btnPrev.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadOverview();
+            }
+        });
+        btnNext.addActionListener(e -> {
+            int totalPages = (int) Math.ceil((double) currentOverviewList.size() / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadOverview();
+            }
+        });
+        btnLast.addActionListener(e -> {
+            int totalPages = (int) Math.ceil((double) currentOverviewList.size() / rowsPerPage);
+            currentPage = Math.max(1, totalPages);
+            loadOverview();
+        });
+
+        paginationBar.add(btnFirst);
+        paginationBar.add(btnPrev);
+        paginationBar.add(lblPageInfo);
+        paginationBar.add(btnNext);
+        paginationBar.add(btnLast);
+
         JPanel card = new JPanel(new BorderLayout());
         card.setBackground(Color.WHITE);
         card.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(226, 232, 240)),
-                new EmptyBorder(10, 10, 10, 10)));
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+        card.add(searchBar, BorderLayout.NORTH);
         card.add(new JScrollPane(tblOverview), BorderLayout.CENTER);
+        card.add(paginationBar, BorderLayout.SOUTH);
         return card;
+    }
+
+    private void stylePageButton(JButton button) {
+        button.setPreferredSize(new Dimension(45, 36));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setBackground(Color.WHITE);
+        button.setForeground(UIHelper.TEXT_DARK);
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(new Color(203, 213, 225)));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
     }
 
     private void showPage(String page) {
@@ -277,6 +397,10 @@ public class DashboardFrame extends JFrame {
             lblTongKhoa.setText(String.valueOf(quanLyKhoa.getAll().size()));
             lblTongMonHoc.setText(String.valueOf(quanLyMonHoc.getAll().size()));
             lblTongLuong.setText(moneyFormat.format(quanLyGiangVien.tinhTongLuong()) + " VND");
+        }
+        currentPage = 1;
+        if (txtSearchDashboard != null) {
+            txtSearchDashboard.setText("");
         }
         loadOverview();
         if (giangVienPanel != null) {
@@ -297,8 +421,47 @@ public class DashboardFrame extends JFrame {
         if (overviewModel == null) {
             return;
         }
+
+        // 1. Lọc theo từ khóa tìm kiếm
+        String query = txtSearchDashboard == null ? "" : txtSearchDashboard.getText().trim();
+        ArrayList<GiangVien> searchResults;
+        if (query.isEmpty()) {
+            searchResults = quanLyGiangVien.getAll();
+        } else {
+            searchResults = quanLyGiangVien.searchGiangVien(query);
+            if (searchResults.isEmpty()) {
+                MessageDialog.showInfo(this, "Không tìm thấy kết quả phù hợp!");
+            }
+        }
+
+        currentOverviewList.clear();
+        currentOverviewList.addAll(searchResults);
+
+        // 2. Phân trang dữ liệu
+        int totalRows = currentOverviewList.size();
+        int totalPages = (int) Math.ceil((double) totalRows / rowsPerPage);
+        if (totalPages == 0) {
+            totalPages = 1;
+        }
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+
+        lblPageInfo.setText("Trang " + currentPage + " / " + totalPages);
+        btnFirst.setEnabled(currentPage > 1);
+        btnPrev.setEnabled(currentPage > 1);
+        btnNext.setEnabled(currentPage < totalPages);
+        btnLast.setEnabled(currentPage < totalPages);
+
         overviewModel.setRowCount(0);
-        for (GiangVien gv : quanLyGiangVien.getAll()) {
+        int startIndex = (currentPage - 1) * rowsPerPage;
+        int endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+
+        for (int i = startIndex; i < endIndex; i++) {
+            GiangVien gv = currentOverviewList.get(i);
             overviewModel.addRow(new Object[]{
                 gv.getMaGV(),
                 gv.getHoTen(),

@@ -6,7 +6,7 @@ public class AuthService {
     private final TaiKhoan taiKhoanMacDinh;
 
     public AuthService() {
-        taiKhoanMacDinh = new TaiKhoan("admin", "123");
+        taiKhoanMacDinh = new TaiKhoan("admin", "Java@123");
     }
 
     public boolean login(String username, String password) {

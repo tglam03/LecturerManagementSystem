@@ -172,7 +172,7 @@ public class LoginFrame extends JFrame {
             new DashboardFrame().setVisible(true);
             dispose();
         } else {
-            MessageDialog.showError(this, "Sai username hoặc password. Tài khoản mặc định: admin / 123");
+            MessageDialog.showError(this, "Đăng nhập không thành công");
             txtPassword.setText("");
             txtUsername.requestFocus();
         }

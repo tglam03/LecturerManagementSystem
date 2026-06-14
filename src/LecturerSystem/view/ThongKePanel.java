@@ -13,14 +13,17 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.text.DecimalFormat;
 import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.border.EmptyBorder;
 
 public class ThongKePanel extends JPanel {
+
     private final QuanLyGiangVien quanLyGiangVien;
     private final QuanLyKhoa quanLyKhoa;
     private final QuanLyMonHoc quanLyMonHoc;
@@ -122,6 +125,7 @@ public class ThongKePanel extends JPanel {
     }
 
     private class BarChartPanel extends JPanel {
+
         BarChartPanel() {
             setBackground(Color.WHITE);
         }
@@ -141,7 +145,7 @@ public class ThongKePanel extends JPanel {
             }
 
             int left = 44;
-            int bottom = getHeight() - 44;
+            int bottom = getHeight() - 120;
             int top = 54;
             int chartWidth = getWidth() - left - 24;
             int chartHeight = bottom - top;
@@ -171,7 +175,10 @@ public class ThongKePanel extends JPanel {
                 g2.drawString(String.valueOf(entry.getValue()), x + barWidth / 2 - 4, y - 6);
                 g2.setColor(UIHelper.TEXT_MUTED);
                 g2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
-                g2.drawString(shortText(entry.getKey()), x - 8, bottom + 18);
+                AffineTransform old = g2.getTransform();
+                g2.rotate(Math.PI / 4, x, bottom + 20);
+                g2.drawString(entry.getKey(), x, bottom + 50);
+                g2.setTransform(old);
                 i++;
             }
             g2.dispose();
@@ -179,6 +186,7 @@ public class ThongKePanel extends JPanel {
     }
 
     private class PieChartPanel extends JPanel {
+
         private final Color[] colors = {
             new Color(37, 99, 235),
             new Color(22, 163, 74),
